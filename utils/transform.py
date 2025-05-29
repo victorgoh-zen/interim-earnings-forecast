@@ -58,14 +58,22 @@ def clean_and_aggregate_earnings(
     bess_year: int = 2025,
     is_cap_adjusted: bool = False,
     is_aurora: bool = False,
+    agg_by_month: bool = False,
 ) -> DataFrame:
 
     if filter_status:
         df = filter_by_status(df)
 
-    df = df.withColumn("year", F.year("interval_date")).withColumn(
-        "quarter", F.quarter("interval_date")
-    )
+    if agg_by_month:
+        df = (
+            df.withColumn("year", F.year("interval_date"))
+            .withColumn("quarter", F.quarter("interval_date"))
+            .withColumn("month", F.month("interval_date"))
+        )
+    else:
+        df = df.withColumn("year", F.year("interval_date")).withColumn(
+            "quarter", F.quarter("interval_date")
+        )
 
     if sample_filter_df:
         filtered_sample = sample_filter_df.filter(F.col("earnings_rank") == rank)
@@ -130,7 +138,7 @@ def clean_and_aggregate_earnings(
             )
         )
     elif is_aurora:
-        df = df.groupBy(
+        groupby_cols = [
             F.col("scenario").alias("curve"),
             "deal_id",
             "deal_name",
@@ -142,8 +150,13 @@ def clean_and_aggregate_earnings(
             "regionid",
             "group",
             "year",
-            "quarter",
-        ).agg(
+        ]
+        if agg_by_month:
+            groupby_cols.append("month")
+        else:
+            groupby_cols.append("quarter")
+
+        df = df.groupBy(groupby_cols).agg(
             F.sum("volume_mwh").alias("volume_mwh"),
             F.sum("cost_amount").alias("total_cost"),
             F.sum("income_amount").alias("total_income"),
@@ -171,6 +184,7 @@ def clean_and_aggregate_earnings(
             F.mean("rrp").alias("twp"),
         )
 
-    df = df.withColumn("curve", F.lit(curve_name))
+    if not is_aurora:
+        df = df.withColumn("curve", F.lit(curve_name))
 
     return df
