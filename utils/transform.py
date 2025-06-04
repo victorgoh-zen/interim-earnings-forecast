@@ -2,10 +2,11 @@ from pyspark.sql import functions as F
 from pyspark.sql import DataFrame
 
 
-def filter_by_status(df: DataFrame) -> DataFrame:
-    return df.filter(
-        F.col("status").isin(["Approved", "Confirmed", "Pending", "Hypothetical"])
-    )
+def filter_by_status(
+    df: DataFrame,
+    status_list: list = ["Approved", "Confirmed", "Pending", "Hypothetical"]
+) -> DataFrame:
+    return df.filter(F.col("status").isin(status_list))
 
 
 def filter_deals_by_id(df: DataFrame, deal_ids: list = [785, 786, 787]) -> DataFrame:
@@ -51,6 +52,7 @@ def clean_and_aggregate_earnings(
     sample_filter_df: DataFrame = None,
     rank: int = 30,
     filter_status: bool = True,
+    status_list: list = None,
     custom_earnings: bool = True,
     filter_deals: bool = True,
     filter_bess: bool = True,
@@ -62,7 +64,7 @@ def clean_and_aggregate_earnings(
 ) -> DataFrame:
 
     if filter_status:
-        df = filter_by_status(df)
+        df = filter_by_status(df, status_list=status_list)
 
     if agg_by_month:
         df = (
