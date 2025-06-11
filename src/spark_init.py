@@ -3,7 +3,7 @@ from databricks.connect import DatabricksSession
 
 _spark_session = None
 
-def get_spark_session():
+def get_spark_session() -> SparkSession:
     global _spark_session
     if _spark_session == None:
         

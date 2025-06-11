@@ -12,4 +12,6 @@ dependencies = [
     "pip>=25.0.1",
     "plotly>=6.0.1",
     "polars>=1.29.0",
+    "pyarrow>=20.0.0",
+    "python-dotenv>=1.1.0",
 ]
