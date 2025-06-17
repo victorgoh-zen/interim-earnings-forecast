@@ -4,7 +4,7 @@ from pyspark.sql import functions as F, Window as W, DataFrame
 from src import spark
 
 spark.sql("USE CATALOG exploration;")
-spark.sql("USE SCHEMA scenario_modelling")
+spark.sql("USE SCHEMA scenario_modelling;")
 
 
 def price_simulations(model_name: str) -> DataFrame:
@@ -16,6 +16,7 @@ def price_simulations(model_name: str) -> DataFrame:
     
     Returns:
         pyspark.sql.DataFrame
+            - model_id: short
             - sample_id: short
             - interval_date: date
             - period_id: short
@@ -25,7 +26,7 @@ def price_simulations(model_name: str) -> DataFrame:
 
     """
     price_models = spark.table("price_models").filter(F.col("model_name") == model_name)
-    price_simulations = spark.table("price_model_simuations")
+    price_simulations = spark.table("price_model_simulations")
 
     if price_models.count() == 0:
         raise Exception(f"{model_name} is not the name of a trained price model.") 
@@ -38,6 +39,7 @@ def price_simulations(model_name: str) -> DataFrame:
             "left_semi"
         )
         .select(
+            F.col("model_id"),
             F.col("sample_id"),
             F.col("interval_date"),
             F.col("period_id"),
