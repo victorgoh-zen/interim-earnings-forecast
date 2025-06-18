@@ -1,5 +1,6 @@
 
 from datetime import date
+from typing import Union
 from pyspark.sql import functions as F, Window as W, DataFrame
 from src import spark
 
@@ -63,12 +64,12 @@ def region_numbers() -> DataFrame:
     """
     return F.broadcast(spark.table("region_numbers"))
 
-def sample_details(model_name):
+def sample_details(model_id: Union[int, str]):
     """
     Retrieve sample configuration details for a specific price model.
     
     Args:
-        model_name (str): The name of the price model to get sample details for.
+        model_id (str): The name or integer ID of the price model to get sample details for.
     
     Returns:
         pyspark.sql.DataFrame: A DataFrame containing:
@@ -81,20 +82,30 @@ def sample_details(model_name):
     price_models = spark.table("price_models")
     sample_details = spark.table("price_model_sample_details")
 
-    output = (
-        sample_details
-        .join(
-            price_models
-            .filter(F.col("model_name") == model_name),
-            "model_id",
-            "left_semi"
+    if type(model) == int:
+        output = (
+            sample_details
+            .filter(F.col("model_id") == model)
         )
-        .select(
-            "sample_id",
-            "demand_reference_year",
-            "gen_reference_year",
-            "scheduled_avail_reference_year"
-        )
-    )
 
-    return output
+    else:
+        output = (
+            sample_details
+            .join(
+                price_models
+                .filter(F.col("model_id") == model_id),
+                "model_id",
+                "left_semi"
+            )
+            
+        )
+
+    return (
+        output
+        .select(
+                "sample_id",
+                "demand_reference_year",
+                "gen_reference_year",
+                "scheduled_avail_reference_year"
+            )
+    )

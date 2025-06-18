@@ -1,5 +1,5 @@
-
 import polars as pl
+
 from datetime import date
 from pyspark.sql import functions as F, Window as W, types as T, DataFrame
 
@@ -11,7 +11,7 @@ FUTURES_PRICES = data.market_price.quarterly_futures_prices().cache()
 
 MTM_PRICE_TABLE = "exploration.scenario_modelling.daily_mtm_scenario_price"
 
-def generate_mtm_scenario(model_name: str) -> None:
+def generate_mtm_scenario_prices(model_name: str) -> None:
     f"""
     Given the name of a price model, find the quarterly samples that most closely align with 
     the futures market then apply adjustments so that the they are completely aligned with the futures market.
@@ -346,10 +346,10 @@ def apply_energy_adjustment(
         price_sample: pl.DataFrame,
         max_iterations: int=10
     ) -> pl.DataFrame:
-    """
+    f"""
     Iteratively adjusts energy prices to match futures market expectations.
     
-    Applies a scaling factor to prices between 0 and CAP_STRIKE to align
+    Applies a scaling factor to prices between 0 and {CAP_STRIKE} to align
     the average quarterly prices with futures energy prices. The adjustment
     is applied iteratively to converge on the target prices.
     
