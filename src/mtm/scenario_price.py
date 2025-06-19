@@ -9,7 +9,7 @@ CAP_STRIKE = 300
 
 FUTURES_PRICES = data.market_price.quarterly_futures_prices().cache()
 
-MTM_PRICE_TABLE = "exploration.scenario_modelling.daily_mtm_scenario_price"
+MTM_PRICE_TABLE = "exploration.earnings_forecast.daily_mtm_scenario_prices"
 
 def generate_mtm_scenario_prices(model_name: str) -> None:
     f"""
@@ -45,6 +45,7 @@ def generate_mtm_scenario_prices(model_name: str) -> None:
                 T.StructField("rrp", T.FloatType(), True)
             ])
         )
+        .orderBy("interval_date", "period_id", "region_number")
         .write.format("delta")
         .mode("overwrite").saveAsTable(MTM_PRICE_TABLE)
     )
