@@ -33,7 +33,7 @@ def deal_settlement_details() -> DataFrame:
     Returns: pyspark.sql.DataFrame
         - deal_id: short
         - product_id: short
-        - deal_type: string
+        - instrument: string
         - buy_sell: string
         - region_number: short
         - start_date: date
@@ -62,7 +62,7 @@ def deal_settlement_details() -> DataFrame:
         .cache()
     )
 
-    ppa_deal_info = (
+    ppa_energy_info = (
         date_calendar
         .select("interval_date")
         .join(
@@ -106,11 +106,11 @@ def deal_settlement_details() -> DataFrame:
             ),
             "left"
         )
-        .join(
-            lgc_rates,
-            ["product_id", "interval_date"],
-            "left"
-        )
+        # .join(
+        #     lgc_rates,
+        #     ["product_id", "interval_date"],
+        #     "left"
+        # )
         .fillna({"escalation_factor": 1})
         .groupBy(
             "ppa_details.deal_id",
@@ -121,8 +121,8 @@ def deal_settlement_details() -> DataFrame:
             "quantity_factor",
             "floor",
             "turndown",
-            "lgc_price",
-            "lgc_percentage",
+            # "lgc_price",
+            # "lgc_percentage",
             "tolling_fee"
         )
         .agg(
@@ -134,8 +134,8 @@ def deal_settlement_details() -> DataFrame:
             "product_id",
             F.when(
                 F.col("tolling_fee").isNotNull(),
-                F.lit("asset_toll")
-            ).otherwise(F.lit("ppa")).alias("deal_type"),
+                F.lit("asset_toll_energy")
+            ).otherwise(F.lit("ppa_energy")).alias("instrument"),
             "buy_sell",
             "region_number",
             "start_date",
@@ -146,19 +146,125 @@ def deal_settlement_details() -> DataFrame:
             F.col("tolling_fee").cast("double"),
             F.col("floor").cast("double"),
             F.col("turndown").cast("double"),
+            # F.when(
+            #     F.col("tolling_fee").isNotNull(),
+            #     F.lit(0) # Hack for TB2, would be better to have this reflected in the source table
+            # )
+            # .otherwise(F.col("lgc_price"))
+            # .cast("double")
+            # .alias("lgc_price"),
+            # F.col("lgc_percentage").cast("double")
+            F.lit(None).cast("double").alias("lgc_price"),
+            F.lit(None).cast("double").alias("lgc_percentage")
+        )
+        .orderBy("deal_id", "product_id", "start_date", "end_date")
+    )
+    
+    ppa_lgc_info = (
+        date_calendar
+        .select("interval_date")
+        .join(
+            lgc_rates
+            .withColumnRenamed("product_id", "lgc_rate_product_id")
+            .alias("lgc_rates"),
+            [ "interval_date"]
+        )
+        .join(
+            ppa_details.alias("ppa_details"),
+            F.col("interval_date").between(F.col("start_date"), F.col("end_date")) &
+            (F.col("lgc_rate_product_id") == F.col("ppa_details.product_id"))
+        )
+        .withColumn(
+            "lgc_price",
             F.when(
-                F.col("tolling_fee").isNotNull(),
+                F.col("product_id") == F.lit(1255),
                 F.lit(0) # Hack for TB2, would be better to have this reflected in the source table
             )
             .otherwise(F.col("lgc_price"))
             .cast("double")
-            .alias("lgc_price"),
-            F.col("lgc_percentage").cast("double")
+        )
+        .join(
+            complete_deal_info.select("product_id", "deal_id", "buy_sell"),
+            ["product_id", "deal_id"]
+        )
+        .groupBy(
+            "deal_id",
+            "product_id",
+            "buy_sell",
+            "region_number",
+            "quantity_factor",
+            "lgc_price",
+            "lgc_percentage"
+        )
+        .agg(
+            F.min("interval_date").alias("start_date"),
+            F.max("interval_date").alias("end_date")
+        )
+        .select(
+            "deal_id",
+            "product_id",
+            F.lit("generation_lgc").alias("instrument"),
+            "buy_sell",
+            "region_number",
+            F.col("start_date"),
+            F.col("end_date"),
+            F.col("quantity_factor").cast("double").alias("quantity"),
+            F.lit(None).cast("double").alias("price"),
+            F.lit(None).cast("double").alias("strike"),
+            F.lit(None).cast("double").alias("tolling_fee"),
+            F.lit(None).cast("double").alias("floor"),
+            F.lit(None).cast("double").alias("turndown"),
+            F.col("lgc_price").cast("double"),
+            F.col("lgc_percentage").cast("double")   
+        )
+        .dropna(subset=["lgc_price"])
+    )
+
+    retail_energy_info = (
+        date_calendar
+        .select("interval_date")
+        .join(
+            complete_deal_info
+            .filter(F.col("instrument") == "Retail Customer"),
+            F.col("interval_date").between(F.col("product_start_date"), F.col("product_end_date"))
+        )
+        .join(data.region_numbers(), "regionid")
+        # .join(lgc_rates, ["product_id", "interval_date"])
+        .groupBy(
+            "deal_id",
+            "product_id",
+            "buy_sell",
+            "region_number",
+            # "lgc_price",
+            # "lgc_percentage"
+        )
+        .agg(
+            F.min("interval_date").alias("start_date"),
+            F.max("interval_date").alias("end_date")
+        )
+        .select(
+            "deal_id",
+            "product_id",
+            F.lit("retail_energy").alias("instrument"),
+            "buy_sell",
+            "region_number",
+            F.col("start_date"),
+            F.col("end_date"),
+            F.lit(None).cast("double").alias("quantity"),
+            F.lit(None).cast("double").alias("price"),
+            F.lit(None).cast("double").alias("strike"),
+            F.lit(None).cast("double").alias("tolling_fee"),
+            F.lit(None).cast("double").alias("floor"),
+            F.lit(None).cast("double").alias("turndown"),
+            # F.col("lgc_price").cast("double"),
+            # F.col("lgc_percentage").cast("double")
+            F.lit(None).cast("double").alias("lgc_price"),
+            F.lit(None).cast("double").alias("lgc_percentage")
         )
         .orderBy("deal_id", "product_id", "start_date", "end_date")
     )
 
-    retail_deal_info = (
+    retail_lgc_info = (
         date_calendar
         .select("interval_date")
         .join(
@@ -183,7 +289,7 @@ def deal_settlement_details() -> DataFrame:
         .select(
             "deal_id",
             "product_id",
-            F.lit("retail").alias("deal_type"),
+            F.lit("retail_lgc").alias("instrument"),
             "buy_sell",
             "region_number",
             F.col("start_date"),
@@ -262,20 +368,20 @@ def deal_settlement_details() -> DataFrame:
             F.when(
                 F.col("shape_product") &
                 (F.col("instrument_calculation") == "Swap"),
-                F.lit("profiled_swap")
+                F.lit("profiled_energy_swap")
             ).when(
                 F.col("shape_product") &
                 (F.col("instrument_calculation") == "Cap"),
-                F.lit("profiled_cap")
+                F.lit("profiled_energy_cap")
             ).when(
                 (~F.col("shape_product")) &
                 (F.col("instrument_calculation") == "Swap"),
-                F.lit("flat_swap")
+                F.lit("flat_energy_swap")
             ).when(
                 (~F.col("shape_product")) &
                 (F.col("instrument_calculation") == "Cap"),
-                F.lit("flat_cap")
-            ).alias("deal_type"),
+                F.lit("flat_energy_cap")
+            ).alias("instrument"),
             "buy_sell",
             "region_number",
             F.col("start_date"),
@@ -293,8 +399,10 @@ def deal_settlement_details() -> DataFrame:
     )
 
     output = (
-        ppa_deal_info
-        .unionByName(retail_deal_info)
+        ppa_energy_info
+        .unionByName(ppa_lgc_info)
+        .unionByName(retail_energy_info)
+        .unionByName(retail_lgc_info)
         .unionByName(wholesale_deal_info)
     )
 
@@ -311,6 +419,7 @@ def update_deal_settlement_details_table() -> None:
 def update_retail_rate_calendar_table() -> None:
     (
         data.sim.retail_rate_calendar()
+        .filter(F.col("interval_date") >= F.lit(date.today()))
         .write.format("delta").mode("overwrite")
         .saveAsTable(RATE_CALENDAR_TABLE)
     )

@@ -1,4 +1,7 @@
 import polars as pl
+from src import data
+
+instruments = pl.from_arrow(data.earnings.instruments().toArrow())
 
 def ppa_energy(
     deal_info: pl.DataFrame,
@@ -10,6 +13,7 @@ def ppa_energy(
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
             - region_number: int8
@@ -30,6 +34,7 @@ def ppa_energy(
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - interval_date: date
         - period_id: int16
         - region_number: int8
@@ -42,8 +47,7 @@ def ppa_energy(
         deal_info
         .join(
             generation_profiles,
-            ["product_id", "interval_date", "period_id"],
-            how="inner"
+            "product_id"
         )
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
         .join(
@@ -60,6 +64,7 @@ def ppa_energy(
         .select(
             "deal_id",
             "product_id",
+            "instrument_id",
             "interval_date",
             "period_id",
             "region_number",
@@ -88,6 +93,7 @@ def asset_toll_energy(
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
             - region_number: int8
@@ -107,6 +113,7 @@ def asset_toll_energy(
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - interval_date: date
         - period_id: int16
         - region_number: int8
@@ -119,8 +126,7 @@ def asset_toll_energy(
         deal_info
         .join(
             generation_profiles,
-            ["product_id", "interval_date", "period_id"],
-            how="inner"
+            "product_id"
         )
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
         .join(
@@ -137,12 +143,13 @@ def asset_toll_energy(
         .select(
             "deal_id",
             "product_id",
+            "instrument_id",
             "interval_date",
             "period_id",
             "region_number",
             "volume_mwh",
             (
-                pl.col("rrp").clip(pl.col("floor"), None)
+                pl.col("rrp")
                 * pl.col("volume_mwh")
             ).cast(pl.Float32()).alias("buy_income"),
             (
@@ -164,6 +171,7 @@ def retail_energy(
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
         load_profiles: pl.DataFrame
@@ -188,6 +196,7 @@ def retail_energy(
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - region_number: int8
         - interval_date: date
         - period_id: int16
@@ -216,6 +225,7 @@ def retail_energy(
         .group_by([
             "deal_id",
             "product_id",
+            "instrument_id",
             "region_number",
             "interval_date",
             "period_id",
@@ -235,19 +245,20 @@ def retail_energy(
 
 def flat_energy_swap(
     deal_info: pl.DataFrame,
-    spot_price: pl.DataFrame
+    spot_prices: pl.DataFrame
 ) -> pl.DataFrame:
     """
     Args:
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
             - region_number: int8
             - quantity_mw: int16
             - price: float64
-        spot_price: pl.DataFrame
+        spot_prices: pl.DataFrame
             - interval_date: date
             - period_id: int16
             - region_number: int8
@@ -256,6 +267,7 @@ def flat_energy_swap(
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - interval_date: date
         - period_id: int16
         - region_number: int8
@@ -266,7 +278,7 @@ def flat_energy_swap(
     result = (
         deal_info
         .join(
-            spot_price,
+            spot_prices,
             ["region_number"]
         )
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
@@ -278,6 +290,7 @@ def flat_energy_swap(
         .select(
             "deal_id",
             "product_id",
+            "instrument_id",
             "interval_date",
             "period_id",
             "region_number",
@@ -295,20 +308,21 @@ def flat_energy_swap(
 
 def flat_energy_cap(
     deal_info: pl.DataFrame,
-    spot_price: pl.DataFrame
+    spot_prices: pl.DataFrame
 ) -> pl.DataFrame:
     """
     Args:
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
             - region_number: int8
             - quantity_mw: int16
             - price: float64
             - strike: float64
-        spot_price: pl.DataFrame
+        spot_prices: pl.DataFrame
             - interval_date: date
             - period_id: int16
             - region_number: int8
@@ -317,6 +331,7 @@ def flat_energy_cap(
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - interval_date: date
         - period_id: int16
         - region_number: int8
@@ -327,7 +342,7 @@ def flat_energy_cap(
     result = (
         deal_info
         .join(
-            spot_price,
+            spot_prices,
             ["region_number"]
         )
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
@@ -339,6 +354,7 @@ def flat_energy_cap(
         .select(
             "deal_id",
             "product_id",
+            "instrument_id",
             "interval_date",
             "period_id",
             "region_number",
@@ -357,14 +373,15 @@ def flat_energy_cap(
 
 def profiled_energy_swap(
     deal_info: pl.DataFrame,
-    product_profies: pl.DataFrame,
-    spot_price: pl.DataFrame
+    product_profiles: pl.DataFrame,
+    spot_prices: pl.DataFrame
 ) -> pl.DataFrame:
     """
     Args:
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
             - region_number: int8
@@ -376,7 +393,7 @@ def profiled_energy_swap(
             - period_id: int16
             - volume_factor: float64
             - price_factor: float64
-        spot_price: pl.DataFrame
+        spot_prices: pl.DataFrame
             - interval_date: date
             - period_id: int16
             - region_number: int8
@@ -385,6 +402,7 @@ def profiled_energy_swap(
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - interval_date: date
         - period_id: int16
         - region_number: int8
@@ -400,7 +418,7 @@ def profiled_energy_swap(
         )
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
         .join(
-            spot_price,
+            spot_prices,
             ["interval_date", "period_id", "region_number"]
         )
         .with_columns(
@@ -412,6 +430,7 @@ def profiled_energy_swap(
         .select(
             "deal_id",
             "product_id",
+            "instrument_id",
             "interval_date",
             "period_id",
             "region_number",
@@ -419,19 +438,25 @@ def profiled_energy_swap(
             (
                 pl.col("rrp") * pl.col("volume_mwh")
             ).cast(pl.Float32()).alias("buy_income"),
+            (
+                pl.col("volume_mwh") * pl.col("price")
+            ).cast(pl.Float32()).alias("sell_income")
         )
     )
 
+    return result
+
 def profiled_energy_cap(
     deal_info: pl.DataFrame,
-    product_profies: pl.DataFrame,
-    spot_price: pl.DataFrame
+    product_profiles: pl.DataFrame,
+    spot_prices: pl.DataFrame
 ) -> pl.DataFrame:
     """
     Args:
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
             - region_number: int8
@@ -444,7 +469,7 @@ def profiled_energy_cap(
             - volume_factor: float64
             - price_factor: float64
             - strike: float64
-        spot_price: pl.DataFrame
+        spot_prices: pl.DataFrame
             - interval_date: date
             - period_id: int16
             - region_number: int8
@@ -453,6 +478,7 @@ def profiled_energy_cap(
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - interval_date: date
         - period_id: int16
         - region_number: int8
@@ -468,7 +494,7 @@ def profiled_energy_cap(
         )
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
         .join(
-            spot_price,
+            spot_prices,
             ["interval_date", "period_id", "region_number"]
         )
         .with_columns(
@@ -480,6 +506,7 @@ def profiled_energy_cap(
         .select(
             "deal_id",
             "product_id",
+            "instrument_id",
             "interval_date",
             "period_id",
             "region_number",
@@ -496,7 +523,7 @@ def profiled_energy_cap(
 
     return result
 
-def ppa_lgc(
+def generation_lgc(
     deal_info: pl.DataFrame,
     generation_profiles: pl.DataFrame,
     lgc_prices: pl.DataFrame
@@ -506,11 +533,13 @@ def ppa_lgc(
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
             - region_number: int8
             - price: float64
             - quantity_factor: float64
+            - lgc_percentage: float64
         generation_profiles: pl.DataFrame
             - product_id: int16
             - interval_date: date
@@ -523,6 +552,7 @@ def ppa_lgc(
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - interval_date: date
         - period_id: int16
         - region_number: int8
@@ -541,14 +571,17 @@ def ppa_lgc(
             lgc_prices,
             "interval_date"
         )
-        .with_column(
+        .with_columns(
             (
-                pl.col("generation_mwh") * pl.col("quantity_factor")
+                pl.col("generation_mwh") *
+                pl.col("quantity_factor") *
+                pl.col("lgc_percentage")
             ).cast(pl.Float32()).alias("volume_mwh")
         )
         .select(
             "deal_id",
             "product_id",
+            "instrument_id",
             "interval_date",
             "period_id",
             "region_number",
@@ -567,17 +600,18 @@ def ppa_lgc(
 def retail_lgc(
     deal_info: pl.DataFrame,
     load_profiles: pl.DataFrame,
-    lgc_price: pl.DataFrame
+    lgc_prices: pl.DataFrame
 ) -> pl.DataFrame:
     """
     Args:
         deal_info: pl.DataFrame
             - deal_id: int16
             - product_id: int16
+            - instrument_id: int16
             - start_date: date
             - end_date: date
             - lgc_percentage: float64
-            - price: date
+            - price: float64
         load_profiles: pl.DataFrame
             - product_id: int16
             - jurisdiction_id: int8
@@ -585,13 +619,14 @@ def retail_lgc(
             - interval_date: date
             - period_id: int16
             - load_mwh
-        lgc_price: pl.DataFrame
+        lgc_prices: pl.DataFrame
             - interval_date: date
             - lgc_price: float64
 
     Returns: pl.DataFrame
         - deal_id: int16
         - product_id: int16
+        - instrument_id: int16
         - region_number: int8
         - interval_date: date
         - period_id: int16
@@ -607,7 +642,7 @@ def retail_lgc(
         )
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
         .join(
-            lgc_price,
+            lgc_prices,
             "interval_date"
         )
         .with_columns(
@@ -618,6 +653,7 @@ def retail_lgc(
         .select(
             "deal_id",
             "product_id",
+            "instrument_id",
             "region_number",
             "interval_date",
             "period_id",
@@ -632,12 +668,3 @@ def retail_lgc(
     )
 
     return result
-
-
-
-
-
-
-
-
-

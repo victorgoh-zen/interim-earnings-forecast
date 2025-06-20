@@ -63,17 +63,17 @@ def region_numbers() -> DataFrame:
         pyspark.sql.DataFrame: A broadcast DataFrame containing region number
         mapping information from the "region_numbers" table.
     """
-    return F.broadcast(spark.table("region_numbers"))
+    return F.broadcast(spark.table("exploration.scenario_modelling.region_numbers"))
 
 def jurisdictions() -> DataFrame:
-    return F.broadcast(spark.table("jurisdictions"))
+    return F.broadcast(spark.table("exploration.scenario_modelling.jurisdictions"))
 
 def sample_details(model_id: Union[int, str]) -> DataFrame:
     """
     Retrieve sample configuration details for a specific price model.
     
     Args:
-        model_id (str): The name or integer ID of the price model to get sample details for.
+        model_id (str | int): The name or integer ID of the price model to get sample details for.
     
     Returns:
         pyspark.sql.DataFrame: A DataFrame containing:

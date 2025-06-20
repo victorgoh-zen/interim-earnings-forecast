@@ -61,7 +61,7 @@ CREATE OR REPLACE TABLE scenario_load_profiles (
 CREATE OR REPLACE TABLE deal_settlement_details (
   deal_id SMALLINT NOT NULL,
   product_id SMALLINT NOT NULL,
-  deal_type STRING NOT NULL,
+  instrument STRING NOT NULL,
   buy_sell STRING NOT NULL,
   region_number TINYINT NOT NULL,
   start_date DATE NOT NULL,
@@ -87,3 +87,20 @@ CREATE OR REPLACE TABLE retail_rate_calendar (
   CONSTRAINT pk_rate_calendar PRIMARY KEY (product_id, jurisdiction_id, interval_date, period_id),
   CONSTRAINT fk_rate_calendar_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES scenario_modelling.jurisdictions(jurisdiction_id)
 );
+
+CREATE OR REPLACE TABLE instruments (
+  instrument_id SMALLINT NOT NULL,
+  instrument STRING NOT NULL,
+  CONSTRAINT instrument_pk PRIMARY KEY (instrument_id)
+);
+
+INSERT INTO instruments (instrument_id, instrument) VALUES 
+  (0, "flat_energy_swap"),
+  (1, "flat_energy_cap"),
+  (2, "profiled_energy_swap"),
+  (3, "profiled_energy_cap"),
+  (4, "ppa_energy"),
+  (5, "asset_toll_energy"),
+  (6, "generation_lgc"),
+  (7, "retail_energy"),
+  (8, "retail_lgc");
