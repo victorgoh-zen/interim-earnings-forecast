@@ -326,7 +326,7 @@ def intermittent_generation_profiles(model_id: Union[int, str]) -> DataFrame:
         )
         .fillna({"transmissionlossfactor": 1.0, "distributionlossfactor": 1.0})
         .withColumn(
-            "generation_mw",
+            "generation_mwh",
             (
                 F.coalesce(
                     F.col("availability"),
@@ -335,7 +335,7 @@ def intermittent_generation_profiles(model_id: Union[int, str]) -> DataFrame:
                 ) * F.col("transmissionlossfactor") * F.col("distributionlossfactor")
             ).cast("float")
         )
-        .dropna(subset=["generation_mw"])
+        .dropna(subset=["generation_mwh"])
         .select(
             "model_id",
             F.col("product_id").cast("integer"),
@@ -343,7 +343,7 @@ def intermittent_generation_profiles(model_id: Union[int, str]) -> DataFrame:
             F.col("month_id").cast("short"),
             F.col("day_id").cast("short"),
             F.col("period_id").cast("short"),
-            "generation_mw"
+            "generation_mwh"
         )
     )
 

@@ -1,8 +1,9 @@
+import os
 import pandas as pd
 
 from datetime import date
 from pyspark.sql import functions as F, Window as W, DataFrame
-from src import spark
+from src import spark, data
 
 def complete_deal_info() -> DataFrame:
     """
@@ -72,19 +73,19 @@ def complete_deal_info() -> DataFrame:
         )
         .filter(F.col("books.active") == "Y")
         .select(
-            F.col("deals.id").alias("deal_id"),
+            F.col("deals.id").cast("short").alias("deal_id"),
             F.col("deals.name").alias("deal_name"),
             F.row_number().over(
                 W.partitionBy("deals.id").orderBy("legs.transferdate")
             ).alias("leg_number"),
-            F.col("products.id").alias("product_id"),
+            F.col("products.id").cast("short").alias("product_id"),
             F.col("products.name").alias("product_name"),
             F.col("deals.buysell").alias("buy_sell"),
-            F.col("deals.dealdate").alias("deal_date"),
+            F.to_date("deals.dealdate").alias("deal_date"),
             F.col("deals.status").alias("status"),
             F.col("products.schedule").alias("product_schedule"),
-            F.col("products.startdate").alias("product_start_date"),
-            F.col("products.enddate").alias("product_end_date"),
+            F.to_date("products.startdate").alias("product_start_date"),
+            F.to_date("products.enddate").alias("product_end_date"),
             F.col("products.term").alias("product_term"),
             F.col("deals.optionality").alias("optionality"),
             F.col("deals.optioncode").alias("option_code"),
@@ -110,21 +111,73 @@ def complete_deal_info() -> DataFrame:
             F.col("instruments.name").alias("instrument"),
             F.col("instruments.calculation").alias("instrument_calculation"),
             F.col("markets.name").alias("market"),
-            F.col("legs.transferdate").alias("transfer_date"),
-            F.col("legs.paymentdate").alias("payment_date")
+            F.to_date("legs.transferdate").alias("transfer_date"),
+            F.to_date("legs.paymentdate").alias("payment_date")
         )
     )
     return output
 
+def deal_factors():
+    sim_deal_factors = spark.table("prod.bronze.etrm_sim_deal_factors")
+
+    output = (
+        sim_deal_factors
+        .select(
+            F.col("dealid").cast("short").alias("deal_id"),
+            F.col("type"),
+            F.col("fromdate").cast("date").alias("from_date"),
+            F.lead(
+                F.date_sub(F.col("fromdate"), 1),
+                1,
+                date(9999, 12, 31)
+            )
+            .over(
+                W.partitionBy("dealid", "type").orderBy("fromdate")
+            ).alias("to_date"),
+            "factor"
+        )
+    )
+
+    return output
+
+def ppa_details():
+    file_dir = os.path.dirname(os.path.abspath(__file__))
+    ppa_details_file_path = os.path.join(file_dir, "..", "..", "utils", "ppa_details.csv")
+    if not os.path.isfile(ppa_details_file_path):
+        raise Exception(f"Missing ppa_details.csv file at {ppa_details_file_path}")
+    
+    ppa_details = (
+        spark.createDataFrame(pd.read_csv(
+            ppa_details_file_path,
+            parse_dates=["product_start_date", "product_end_date"],
+            date_format="%d/%m/%Y"
+        ))
+        .join(data.region_numbers(), "regionid")
+        .select(
+            F.col("deal_id").cast("short"),
+            F.col("product_id").cast("short"),
+            F.col("name"),
+            F.col("duid"),
+            F.col("fuel"),
+            F.col("floor").cast("double"),
+            F.col("turndown").cast("double"),
+            F.col("size_mw").cast("double"),
+            F.col("rez"),
+            F.col("regionid"),
+            F.col("region_number"),
+            F.to_date("product_start_date").alias("start_date"),
+            F.to_date("product_end_date").alias("end_date"),
+            F.col("quantity_factor").cast("double")
+        )
+    )
+    return F.broadcast(ppa_details)
+
 def calendar() -> DataFrame:
-    jurisdiction_region_id = spark.createDataFrame(pd.DataFrame({
-        "jurisdiction": ["SA", "VIC", "NSW", "ACT", "QLD"],
-        "regionid": ["SA1", "VIC1", "NSW1", "NSW1", "QLD1"]
-    }))
+    jurisdictions = data.jurisdictions()
 
     output = (
         spark.table("prod.silver.calendar_datetime")
-        .crossJoin(jurisdiction_region_id.select("jurisdiction").distinct())
+        .crossJoin(jurisdictions)
         .join(
             spark.table("prod.silver.calendar_public_holiday")
             .select(
@@ -137,9 +190,8 @@ def calendar() -> DataFrame:
         )
         .select(
             F.col("date").alias("interval_date"),
-            F.col("jurisdiction"),
-            F.col("datetime").alias("interval_date_time"),
-            F.col("period").alias("period_id"),
+            F.col("jurisdiction_id"),
+            F.col("period").cast("short").alias("period_id"),
             F.col("day_of_week"),
             F.col("holiday_name").isNotNull().alias("public_holiday")
         )
@@ -192,7 +244,7 @@ def rates() -> DataFrame:
             )
         )
         .select(
-            F.col("productid").alias("product_id"),
+            F.col("productid").cast("short").alias("product_id"),
             F.col("fromdate").alias("from_date"),
             F.col("todate").alias("to_date"),
             F.col("daytype").alias("day_type"),
@@ -226,12 +278,56 @@ def rate_calendar(
             (F.col("rate.day_type") == F.col("calendar.day_type"))
         )
         .select(
-            "product_id",
-            "jurisdiction",
-            "interval_date_time",
+            F.col("product_id").cast("short"),
+            "jurisdiction_id",
             "interval_date",
-            "calendar.period_id",
-            "rate"
+            F.col("calendar.period_id").cast("short"),
+            F.col("rate").cast("float")
         )
     ).cache()
     return output
+
+def product_profiles():
+    profiles_table = spark.table("exploration.denise_ng.sim_daytypes_profile")
+    
+    flat_products = (
+        spark.table("prod.bronze.etrm_sim_products")
+        .filter(F.col("schedule").isin(["Flat", "Base"]))
+        .select(F.col("id").alias("product_id"))
+        .distinct()
+    )
+
+    output = (
+        profiles_table
+        .select(
+            F.col("PRODUCT_ID").cast("short").alias("product_id"),
+            F.col("INTERVAL_DATE").alias("interval_date"),
+            F.col("PERIOD_5MIN").cast("short").alias("period_id"),
+            F.col("PROFILE_MW").alias("profile_mw"),
+            F.col("PROFILE_STRIKE").alias("profile_strike")
+        )
+        .join(flat_products, "product_id", "left_anti")
+    )
+
+    return output
+
+def lgc_rates():
+    rate_source_table = spark.table("exploration.denise_ng.mtlf_hh")
+
+    output = (
+        rate_source_table
+        .select(
+            F.col("productid").cast("short").alias("product_id"),
+            F.col("date").alias("interval_date"),
+            F.col("green_rate").cast("double").alias("lgc_price"),
+            F.col("green_percentage").cast("double").alias("lgc_percentage")
+        )
+        .dropDuplicates(subset=["product_id", "interval_date"])
+    )
+    return output
+
+
+
+
+
+

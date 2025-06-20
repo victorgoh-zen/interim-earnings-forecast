@@ -80,7 +80,8 @@ def ppa_energy(
 def asset_toll_energy(
     deal_info: pl.DataFrame,
     generation_profiles: pl.DataFrame,
-    spot_prices: pl.DataFrame
+    spot_prices: pl.DataFrame,
+    intervals_per_day: int=288
 ) -> pl.DataFrame:
     """
     Args:
@@ -145,7 +146,7 @@ def asset_toll_energy(
                 * pl.col("volume_mwh")
             ).cast(pl.Float32()).alias("buy_income"),
             (
-                pl.col("tolling_fee") / pl.lit(288)
+                pl.col("tolling_fee") / pl.lit(intervals_per_day)
             ).cast(pl.Float32()).alias("sell_income")
         )
     )
@@ -233,7 +234,7 @@ def retail_energy(
     return result
 
 def flat_energy_swap(
-    deal_info: pl.DataFrme,
+    deal_info: pl.DataFrame,
     spot_price: pl.DataFrame
 ) -> pl.DataFrame:
     """
@@ -551,7 +552,7 @@ def ppa_lgc(
             "interval_date",
             "period_id",
             "region_number",
-            "volume_mwh,
+            "volume_mwh",
             (
                 pl.col("volume_mwh") * pl.col("lgc_price")
             ).cast(pl.Float32()).alias("buy_income"),
@@ -575,6 +576,7 @@ def retail_lgc(
             - product_id: int16
             - start_date: date
             - end_date: date
+            - lgc_percentage: float64
             - price: date
         load_profiles: pl.DataFrame
             - product_id: int16
@@ -608,18 +610,23 @@ def retail_lgc(
             lgc_price,
             "interval_date"
         )
+        .with_columns(
+            (
+                pl.col("load_mwh") * pl.col("lgc_percentage")
+            ).cast(pl.Float32()).alias("volume_mwh")
+        )
         .select(
             "deal_id",
             "product_id",
             "region_number",
             "interval_date",
             "period_id",
-            pl.col("load_mwh").cast(pl.Float32()).alias("volume_mwh"),
+            "volume_mwh",
             (
-                pl.col("load_mwh") * pl.col("lgc_price")
-            ).cast(pl.Float32()).alias("buy_income"), 
+                pl.col("volume_mwh") * pl.col("lgc_price")
+            ).cast(pl.Float32()).alias("buy_income"),
             (
-                pl.col("load_mwh") * pl.col("price")
+                pl.col("volume_mwh") * pl.col("price")
             ).cast(pl.Float32()).alias("sell_income")
         )
     )

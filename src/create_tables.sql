@@ -39,7 +39,7 @@ CREATE OR REPLACE TABLE scenario_generation_profiles (
   month_id SMALLINT NOT NULL,
   day_id SMALLINT NOT NULL,
   period_id SMALLINT NOT NULL,
-  generation_mw FLOAT NOT NULL,
+  generation_mwh FLOAT NOT NULL,
   CONSTRAINT pk_generation_profile PRIMARY KEY (product_id, year, month_id, day_id, period_id),
   CONSTRAINT fk_generation_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id)
 );
@@ -56,4 +56,34 @@ CREATE OR REPLACE TABLE scenario_load_profiles (
   CONSTRAINT pk_load_profile PRIMARY KEY (product_id, jurisdiction_id, year, month_id, day_id, period_id),
   CONSTRAINT fk_load_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id),
   CONSTRAINT fk_load_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES scenario_modelling.jurisdictions(jurisdiction_id)
+);
+
+CREATE OR REPLACE TABLE deal_settlement_details (
+  deal_id SMALLINT NOT NULL,
+  product_id SMALLINT NOT NULL,
+  deal_type STRING NOT NULL,
+  buy_sell STRING NOT NULL,
+  region_number TINYINT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  quantity DOUBLE,
+  price DOUBLE,
+  strike DOUBLE,
+  tolling_fee DOUBLE,
+  floor DOUBLE,
+  turndown DOUBLE,
+  lgc_price DOUBLE,
+  lgc_percentage DOUBLE,
+  CONSTRAINT pk_deal_settlement PRIMARY KEY (deal_id, product_id, start_date),
+  CONSTRAINT fk_deal_settlement_region FOREIGN KEY (region_number) REFERENCES scenario_modelling.region_numbers(region_number)
+);
+
+CREATE OR REPLACE TABLE rate_calendar (
+  product_id SMALLINT NOT NULL,
+  jurisdiction_id TINYINT NOT NULL,
+  interval_date DATE NOT NULL,
+  period_id SMALLINT NOT NULL,
+  rate FLOAT NOT NULL,
+  CONSTRAINT pk_rate_calendar PRIMARY KEY (product_id, jurisdiction_id, interval_date, period_id),
+  CONSTRAINT fk_rate_calendar_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES scenario_modelling.jurisdictions(jurisdiction_id)
 );
