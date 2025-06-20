@@ -3,7 +3,7 @@ from pyspark.sql import functions as F, DataFrame
 from src import data
 
 SETTLEMENT_DETAILS_TABLE = "exploration.earnings_forecast.deal_settlement_details"
-RATE_CALENDAR_TABLE = "exploration.earnings_forecast.rate_calendar"
+RATE_CALENDAR_TABLE = "exploration.earnings_forecast.retail_rate_calendar"
 
 def deal_settlement_details() -> DataFrame:
     """
@@ -308,9 +308,9 @@ def update_deal_settlement_details_table() -> None:
     )
     return
 
-def update_rate_calendar_table() -> None:
+def update_retail_rate_calendar_table() -> None:
     (
-        data.sim.rate_calendar()
+        data.sim.retail_rate_calendar()
         .write.format("delta").mode("overwrite")
         .saveAsTable(RATE_CALENDAR_TABLE)
     )

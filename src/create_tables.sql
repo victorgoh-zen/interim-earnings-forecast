@@ -78,7 +78,7 @@ CREATE OR REPLACE TABLE deal_settlement_details (
   CONSTRAINT fk_deal_settlement_region FOREIGN KEY (region_number) REFERENCES scenario_modelling.region_numbers(region_number)
 );
 
-CREATE OR REPLACE TABLE rate_calendar (
+CREATE OR REPLACE TABLE retail_rate_calendar (
   product_id SMALLINT NOT NULL,
   jurisdiction_id TINYINT NOT NULL,
   interval_date DATE NOT NULL,

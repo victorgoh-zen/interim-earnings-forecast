@@ -210,10 +210,24 @@ def calendar() -> DataFrame:
 
     return output
 
-def rates() -> DataFrame:
+def retail_rates() -> DataFrame:
     """
     Pulls rates from sim profiles table.
     """
+
+    # There must be a better way to do this
+    product_jurisdictions = (
+        spark.table("prod.silver.stlf_predictions")
+        .join(
+            data.jurisdictions(),
+            "jurisdiction"
+        )
+        .select(
+            "product_id",
+            "jurisdiction_id"
+        )
+        .distinct()
+    )
 
     output = (
         spark.table("prod.bronze.etrm_sim_profiles")
@@ -243,10 +257,13 @@ def rates() -> DataFrame:
                 F.col("product_end_date")
             )
         )
+        .withColumnRenamed("productid", "product_id")
+        .join(product_jurisdictions, "product_id")
         .select(
-            F.col("productid").cast("short").alias("product_id"),
+            F.col("product_id").cast("short").alias("product_id"),
             F.col("fromdate").alias("from_date"),
             F.col("todate").alias("to_date"),
+            F.col("jurisdiction_id"),
             F.col("daytype").alias("day_type"),
             F.col("period").alias("period_id"),
             F.col("value").alias("rate")
@@ -255,7 +272,7 @@ def rates() -> DataFrame:
 
     return output
 
-def rate_calendar(
+def retail_rate_calendar(
     start_date: date=date(2000, 1, 1),
     end_date: date=date(2050, 12 ,31)
 ) -> DataFrame:
@@ -268,18 +285,19 @@ def rate_calendar(
         .filter(F.col("interval_date").between(F.lit(start_date), F.lit(end_date)))
         .alias("calendar")
         .join(
-            rates()
+            retail_rates()
             .filter(
                 (F.col("from_date") <= F.lit(end_date)) &
                 (F.col("to_date") >= F.lit(start_date)))
-            .alias("rate"),
+            .alias("retail_rate"),
             F.col("interval_date").between(F.col("from_date"), F.col("to_date")) &
-            (F.col("rate.period_id") == F.col("calendar.period_id")) &
-            (F.col("rate.day_type") == F.col("calendar.day_type"))
+            (F.col("retail_rate.period_id") == F.col("calendar.period_id")) &
+            (F.col("retail_rate.day_type") == F.col("calendar.day_type")) &
+            (F.col("retail_rate.jurisdiction_id") == F.col("calendar.jurisdiction_id"))
         )
         .select(
-            F.col("product_id").cast("short"),
-            "jurisdiction_id",
+            F.col("retail_rate.product_id").cast("short"),
+            "retail_rate.jurisdiction_id",
             "interval_date",
             F.col("calendar.period_id").cast("short"),
             F.col("rate").cast("float")
