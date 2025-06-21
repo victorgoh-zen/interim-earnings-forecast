@@ -5,8 +5,6 @@ from typing import Union
 from pyspark.sql import functions as F, Window as W, DataFrame
 from src import spark, data
 
-spark.sql("USE CATALOG exploration;")
-spark.sql("USE SCHEMA scenario_modelling;")
 
 
 def price_simulations(model_name: str) -> DataFrame:
@@ -27,8 +25,8 @@ def price_simulations(model_name: str) -> DataFrame:
     
 
     """
-    price_models = spark.table("price_models").filter(F.col("model_name") == model_name)
-    price_simulations = spark.table("price_model_simulations")
+    price_models = spark.table("exploration.scenario_modelling.price_models").filter(F.col("model_name") == model_name)
+    price_simulations = spark.table("exploration.scenario_modelling.price_model_simulations")
 
     if price_models.count() == 0:
         raise Exception(f"{model_name} is not the name of a trained price model.") 
@@ -83,8 +81,8 @@ def sample_details(model_id: Union[int, str]) -> DataFrame:
             - scheduled_avail_reference_year: short
     
     """
-    price_models = spark.table("price_models")
-    sample_details = spark.table("price_model_sample_details")
+    price_models = spark.table("exploration.scenario_modelling.price_models")
+    sample_details = spark.table("exploration.scenario_modelling.price_model_sample_details")
 
     if type(model_id) == int:
         output = (
@@ -161,7 +159,7 @@ def intermittent_generation_profiles(model_id: Union[int, str]) -> DataFrame:
     )
 
     regional_intermittent_capacity = (
-        spark.table("intermittent_capacity")
+        spark.table("exploration.scenario_modelling.intermittent_capacity")
         .select(
             "region_number",
             F.year("interval_date").alias("year"),

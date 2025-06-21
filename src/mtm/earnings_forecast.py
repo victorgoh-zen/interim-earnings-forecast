@@ -7,7 +7,7 @@ from src import data, spark
 
 MTM_EARNINGS_TABLE = "exploration.earnings_forecast.daily_mtm_scenario_earnings"
 
-def mtm_earnings_forecast() -> None:
+def calculate_earnings_forecast() -> None:
     """
     Performs earnings calcluations on the MtM earnings scenario writes out the result.
     """

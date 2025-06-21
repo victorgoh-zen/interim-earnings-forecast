@@ -11,7 +11,7 @@ FUTURES_PRICES = data.market_price.quarterly_futures_prices().cache()
 
 MTM_PRICE_TABLE = "exploration.earnings_forecast.daily_mtm_scenario_prices"
 
-def generate_mtm_scenario_prices(model_name: str) -> None:
+def generate_scenario_prices(model_name: str) -> None:
     f"""
     Given the name of a price model, find the quarterly samples that most closely align with 
     the futures market then apply adjustments so that the they are completely aligned with the futures market.
@@ -388,7 +388,10 @@ def apply_energy_adjustment(
         .toArrow()
     )
 
-    while True:
+
+    iterations = 0
+    while True and (iterations < max_iterations):
+        iterations +=1
         mid_price_adjustment = (
             price_sample
             .group_by([
