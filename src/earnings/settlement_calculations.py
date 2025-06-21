@@ -1,7 +1,11 @@
 import polars as pl
 from src import data
 
-instruments = pl.from_arrow(data.earnings.instruments().toArrow())
+# Should change deal info to take general deal info as input
+# and handle column selection in function rather than pre-input
+
+INTERVALS_PER_HOUR = 12
+INTERVALS_PER_DAY = 288
 
 def ppa_energy(
     deal_info: pl.DataFrame,
@@ -85,8 +89,7 @@ def ppa_energy(
 def asset_toll_energy(
     deal_info: pl.DataFrame,
     generation_profiles: pl.DataFrame,
-    spot_prices: pl.DataFrame,
-    intervals_per_day: int=288
+    spot_prices: pl.DataFrame
 ) -> pl.DataFrame:
     """
     Args:
@@ -97,7 +100,7 @@ def asset_toll_energy(
             - start_date: date
             - end_date: date
             - region_number: int8
-            - tolling_fee: float64 (daily???)
+            - tolling_fee: float64 (daily)
             - quantity_factor: float64
         generation_profiles: pl.DataFrame
             - product_id: int16
@@ -153,7 +156,7 @@ def asset_toll_energy(
                 * pl.col("volume_mwh")
             ).cast(pl.Float32()).alias("buy_income"),
             (
-                pl.col("tolling_fee") / pl.lit(intervals_per_day)
+                pl.col("tolling_fee") / pl.lit(INTERVALS_PER_DAY)
             ).cast(pl.Float32()).alias("sell_income")
         )
     )
@@ -226,9 +229,9 @@ def retail_energy(
             "deal_id",
             "product_id",
             "instrument_id",
-            "region_number",
             "interval_date",
             "period_id",
+            "region_number",
         ])
         .agg(
             pl.col("load_mwh").sum().cast(pl.Float32()).alias("volume_mwh"),
@@ -284,7 +287,7 @@ def flat_energy_swap(
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
         .with_columns(
             (
-                pl.col("quantity_mw") / pl.lit(12)
+                pl.col("quantity_mw") / pl.lit(INTERVALS_PER_HOUR)
             ).cast(pl.Float32()).alias("volume_mwh")
         )
         .select(
@@ -297,10 +300,10 @@ def flat_energy_swap(
             "volume_mwh",
             (
                 pl.col("volume_mwh") * pl.col("rrp")
-            ).alias("buy_income"),
+            ).cast(pl.Float32()).alias("buy_income"),
             (
                 pl.col("volume_mwh") * pl.col("price")
-            ).alias("sell_income")
+            ).cast(pl.Float32()).alias("sell_income")
         )
     )
 
@@ -348,7 +351,7 @@ def flat_energy_cap(
         .filter(pl.col("interval_date").is_between(pl.col("start_date"), pl.col("end_date")))
         .with_columns(
             (
-                pl.col("quantity_mw") / pl.lit(12)
+                pl.col("quantity_mw") / pl.lit(INTERVALS_PER_HOUR)
             ).cast(pl.Float32()).alias("volume_mwh")
         )
         .select(
@@ -423,7 +426,7 @@ def profiled_energy_swap(
         )
         .with_columns(
             (
-                pl.col("quantity_mw") / pl.lit(12)
+                pl.col("quantity_mw") / pl.lit(INTERVALS_PER_HOUR)
                 * pl.col("volume_factor")
             ).cast(pl.Float32()).alias("volume_mwh")
         )
@@ -499,7 +502,7 @@ def profiled_energy_cap(
         )
         .with_columns(
             (
-                pl.col("quantity_mw") / 12
+                pl.col("quantity_mw") / pl.lit(INTERVALS_PER_HOUR)
                 * pl.col("volume_factor")
             ).cast(pl.Float32()).alias("volume_mwh")
         )
@@ -654,9 +657,9 @@ def retail_lgc(
             "deal_id",
             "product_id",
             "instrument_id",
-            "region_number",
             "interval_date",
             "period_id",
+            "region_number",
             "volume_mwh",
             (
                 pl.col("volume_mwh") * pl.col("lgc_price")

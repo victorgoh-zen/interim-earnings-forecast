@@ -15,21 +15,19 @@ CREATE OR REPLACE TABLE daily_mtm_scenario_prices (
 );
 
 CREATE OR REPLACE TABLE daily_mtm_scenario_earnings (
-  group STRING NOT NULL,
-  product_id INT NOT NULL,
-  deal_id INT NOT NULL,
-  deal_name STRING NOT NULL,
-  status STRING NOT NULL,
-  deal_date DATE NOT NULL,
-  strategy STRING NOT NULL,
-  regionid STRING NOT NULL,
+  product_id SMALLINT NOT NULL,
+  deal_id SMALLINT NOT NULL,
+  instrument_id SMALLINT NOT NULL,
+  region_number TINYINT NOT NULL,
+  buy BOOLEAN NOT NULL,
   interval_date DATE NOT NULL,
   period_id SMALLINT NOT NULL,
-  buy_sell STRING NOT NULL,
   volume_mwh FLOAT NOT NULL,
-  rrp FLOAT NOT NULL,
-  cost_amount FLOAT NOT NULL,
-  income_amount FLOAT NOT NULL
+  income FLOAT NOT NULL,
+  cost FLOAT NOT NULL,
+  CONSTRAINT pk_mtm_earnings  PRIMARY KEY (product_id, deal_id, instrument_id, region_number, interval_date, period_id),
+  CONSTRAINT fk_mtm_earnings_region FOREIGN KEY (region_number) REFERENCES scenario_modelling.region_numbers(region_number),
+  CONSTRAINT fk_mtm_earnings_instrument FOREIGN KEY (insrument_id) REFERENCES instruments(instrument_id)
 );
 
 CREATE OR REPLACE TABLE scenario_generation_profiles (
@@ -62,7 +60,7 @@ CREATE OR REPLACE TABLE deal_settlement_details (
   deal_id SMALLINT NOT NULL,
   product_id SMALLINT NOT NULL,
   instrument STRING NOT NULL,
-  buy_sell STRING NOT NULL,
+  buy BOOLEAN NOT NULL,
   region_number TINYINT NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,

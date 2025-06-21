@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from pyspark.sql import functions as F, DataFrame
+from pyspark.sql import functions as F, types as T, DataFrame
 from src import data
 
 SETTLEMENT_DETAILS_TABLE = "exploration.earnings_forecast.deal_settlement_details"
@@ -187,6 +187,7 @@ def deal_settlement_details() -> DataFrame:
             complete_deal_info.select("product_id", "deal_id", "buy_sell"),
             ["product_id", "deal_id"]
         )
+        .fillna({"lgc_percentage": 0, "lgc_price": 0}) #### NEED TO VERIFY/GET BETTER SOURCE OF LGC RATES ####
         .groupBy(
             "deal_id",
             "product_id",
@@ -214,8 +215,8 @@ def deal_settlement_details() -> DataFrame:
             F.lit(None).cast("double").alias("tolling_fee"),
             F.lit(None).cast("double").alias("floor"),
             F.lit(None).cast("double").alias("turndown"),
-            F.col("lgc_price").cast("double"),
-            F.col("lgc_percentage").cast("double")   
+            F.coalesce(F.col("lgc_price"), F.lit(0.0)).cast("double").alias("lgc_price"),
+            F.coalesce(F.col("lgc_percentage"), F.lit(0.0)).cast("double").alias("lgc_percentage")
         )
         .dropna(subset=["lgc_price"])
     )
@@ -274,6 +275,7 @@ def deal_settlement_details() -> DataFrame:
         )
         .join(data.region_numbers(), "regionid")
         .join(lgc_rates, ["product_id", "interval_date"])
+        .fillna({"lgc_percentage": 0, "lgc_price": 0}) #### NEED TO VERIFY/GET BETTER SOURCE OF LGC RATES ####
         .groupBy(
             "deal_id",
             "product_id",
@@ -300,8 +302,8 @@ def deal_settlement_details() -> DataFrame:
             F.lit(None).cast("double").alias("tolling_fee"),
             F.lit(None).cast("double").alias("floor"),
             F.lit(None).cast("double").alias("turndown"),
-            F.col("lgc_price").cast("double"),
-            F.col("lgc_percentage").cast("double")
+            F.coalesce(F.col("lgc_price"), F.lit(0.0)).cast("double").alias("lgc_price"),
+            F.coalesce(F.col("lgc_percentage"), F.lit(0.0)).cast("double").alias("lgc_percentage")
         )
         .orderBy("deal_id", "product_id", "start_date", "end_date")
     )
@@ -404,6 +406,26 @@ def deal_settlement_details() -> DataFrame:
         .unionByName(retail_energy_info)
         .unionByName(retail_lgc_info)
         .unionByName(wholesale_deal_info)
+        .select(
+            "deal_id",
+            "product_id",
+            "instrument",
+            F.when(
+                F.col("buy_sell") == F.lit("Buy"),
+                F.lit(True)
+            ).otherwise(F.lit(False)).cast(T.BooleanType()).alias("buy"),
+            "region_number",
+            "start_date",
+            "end_date",
+            "quantity",
+            "price",
+            "strike",
+            "tolling_fee",
+            "floor",
+            "turndown",
+            "lgc_price",
+            "lgc_percentage"
+        )
     )
 
     return output
