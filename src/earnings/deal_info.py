@@ -31,12 +31,12 @@ def deal_settlement_details() -> DataFrame:
     Args: None
 
     Returns: pyspark.sql.DataFrame
-        - deal_id: short
-        - product_id: short
-        - instrument: string
+        - deal_id: short (pk)
+        - product_id: short (pk)
+        - instrument: string (pk)
         - buy_sell: string
-        - region_number: short
-        - start_date: date
+        - region_number: short (pk)
+        - start_date: date (pk)
         - end_date: date
         - quantity: double
         - price: double
@@ -106,11 +106,6 @@ def deal_settlement_details() -> DataFrame:
             ),
             "left"
         )
-        # .join(
-        #     lgc_rates,
-        #     ["product_id", "interval_date"],
-        #     "left"
-        # )
         .fillna({"escalation_factor": 1})
         .groupBy(
             "ppa_details.deal_id",
@@ -121,8 +116,6 @@ def deal_settlement_details() -> DataFrame:
             "quantity_factor",
             "floor",
             "turndown",
-            # "lgc_price",
-            # "lgc_percentage",
             "tolling_fee"
         )
         .agg(
@@ -146,14 +139,6 @@ def deal_settlement_details() -> DataFrame:
             F.col("tolling_fee").cast("double"),
             F.col("floor").cast("double"),
             F.col("turndown").cast("double"),
-            # F.when(
-            #     F.col("tolling_fee").isNotNull(),
-            #     F.lit(0) # Hack for TB2, would be better to have this reflected in the source table
-            # )
-            # .otherwise(F.col("lgc_price"))
-            # .cast("double")
-            # .alias("lgc_price"),
-            # F.col("lgc_percentage").cast("double")
             F.lit(None).cast("double").alias("lgc_price"),
             F.lit(None).cast("double").alias("lgc_percentage")
         )
@@ -230,14 +215,11 @@ def deal_settlement_details() -> DataFrame:
             F.col("interval_date").between(F.col("product_start_date"), F.col("product_end_date"))
         )
         .join(data.region_numbers(), "regionid")
-        # .join(lgc_rates, ["product_id", "interval_date"])
         .groupBy(
             "deal_id",
             "product_id",
             "buy_sell",
-            "region_number",
-            # "lgc_price",
-            # "lgc_percentage"
+            "region_number"
         )
         .agg(
             F.min("interval_date").alias("start_date"),
@@ -257,8 +239,6 @@ def deal_settlement_details() -> DataFrame:
             F.lit(None).cast("double").alias("tolling_fee"),
             F.lit(None).cast("double").alias("floor"),
             F.lit(None).cast("double").alias("turndown"),
-            # F.col("lgc_price").cast("double"),
-            # F.col("lgc_percentage").cast("double")
             F.lit(None).cast("double").alias("lgc_price"),
             F.lit(None).cast("double").alias("lgc_percentage")
         )
@@ -400,12 +380,34 @@ def deal_settlement_details() -> DataFrame:
         .orderBy("deal_id", "product_id", "start_date", "end_date")
     )
 
+    storage_info = (
+        data.sim.storage_details()
+        .select(
+            "deal_id",
+            "product_id",
+            F.lit("asset_toll_energy").alias("instrument"),
+            "buy_sell",
+            "region_number",
+            "start_date",
+            "date",
+            F.lit(1).cast("double").alias("quantity"),
+            F.lit(None).cast("double").alias("price"),
+            F.lit(None).cast("double").alias("strike"),
+            (F.col("toll")*F.col("capacity")*F.lit(24)).cast("double").alias("tolling_fee"),
+            F.lit(None).cast("double").alias("floor"),
+            F.lit(None).cast("double").alias("turndown"),
+            F.lit(None).cast("double").alias("lgc_price"),
+            F.lit(None).cast("double").alias("lgc_percentage")
+        )
+    )
+
     output = (
         ppa_energy_info
         .unionByName(ppa_lgc_info)
         .unionByName(retail_energy_info)
         .unionByName(retail_lgc_info)
         .unionByName(wholesale_deal_info)
+        .unionByName(storage_info)
         .select(
             "deal_id",
             "product_id",

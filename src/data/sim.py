@@ -140,9 +140,13 @@ def deal_factors():
 
     return output
 
+###############################################################################################
+##################### DON'T ALLOW THIS TO BECOME A PERMANENT SOLUTION -_- #####################
+#####################   NEED A BETTER PLACE FOR CAPTURING THESE DETAILS   #####################
+###############################################################################################
 def ppa_details():
     file_dir = os.path.dirname(os.path.abspath(__file__))
-    ppa_details_file_path = os.path.join(file_dir, "..", "..", "utils", "ppa_details.csv")
+    ppa_details_file_path = os.path.join(file_dir, "..", "..", "supplementary_deal_capture", "ppa_details.csv")
     if not os.path.isfile(ppa_details_file_path):
         raise Exception(f"Missing ppa_details.csv file at {ppa_details_file_path}")
     
@@ -171,6 +175,43 @@ def ppa_details():
         )
     )
     return F.broadcast(ppa_details)
+
+def storage_details() -> DataFrame:
+    file_dir = os.path.dirname(os.path.abspath(__file__))
+    storage_details_file_path = os.path.join(file_dir, "..", "..", "supplementary_deal_capture", "storage_details.csv")
+    if not os.path.isfile(storage_details_file_path):
+        raise Exception(f"Missing `storage_details.csv` file at {storage_details_file_path}")
+
+    output = (
+        spark.createDataFrame(pd.read_csv(
+            storage_details_file_path,
+            parse_dates=["start_date", "end_date"],
+            date_format="%Y-%m-%d"
+        ))
+        .join(data.region_numbers(), "regionid")
+        .select(
+            F.col("deal_id").cast("short"),
+            F.col("product_id").cast("short"),
+            F.col("name"),
+            F.col("duid"),
+            F.col("buy_sell"),
+            F.col("regionid"),
+            F.col("region_number"),
+            F.col("start_date").cast("date"),
+            F.col("end_date").cast("date"),
+            F.col("capacity").cast("double"),
+            F.col("duration").cast("double"),
+            F.col("rte").cast("double"),
+            F.col("toll").cast("double")
+        )
+    )
+
+    return output
+
+###############################################################################################
+###############################################################################################
+###############################################################################################
+###############################################################################################
 
 def calendar() -> DataFrame:
     jurisdictions = data.jurisdictions()
