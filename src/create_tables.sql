@@ -8,7 +8,7 @@ CREATE OR REPLACE TABLE daily_mtm_scenario_prices (
   period_id SMALLINT NOT NULL,
   region_number TINYINT NOT NULL,
   rrp FLOAT NOT NULL,
-  CONSTRAINT pk_mtm_scenario PRIMARY KEY (model_id, sample_id, interval_date, period_id, region_number),
+  CONSTRAINT pk_mtm_scenario PRIMARY KEY (interval_date, period_id, region_number),
   CONSTRAINT fk_mtm_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id),
   CONSTRAINT fk_mtm_sample FOREIGN KEY (model_id, sample_id) REFERENCES scenario_modelling.price_model_sample_details(model_id, sample_id),
   CONSTRAINT fk_mtm_region FOREIGN KEY (region_number) REFERENCES scenario_modelling.region_numbers(region_number)
@@ -27,7 +27,7 @@ CREATE OR REPLACE TABLE daily_mtm_scenario_earnings (
   cost FLOAT NOT NULL,
   CONSTRAINT pk_mtm_earnings  PRIMARY KEY (product_id, deal_id, instrument_id, region_number, interval_date, period_id),
   CONSTRAINT fk_mtm_earnings_region FOREIGN KEY (region_number) REFERENCES scenario_modelling.region_numbers(region_number),
-  CONSTRAINT fk_mtm_earnings_instrument FOREIGN KEY (insrument_id) REFERENCES instruments(instrument_id)
+  CONSTRAINT fk_mtm_earnings_instrument FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id)
 );
 
 CREATE OR REPLACE TABLE scenario_generation_profiles (

@@ -240,7 +240,7 @@ def add_cap_spikes(price_sample: pl.DataFrame, market_price_cap:int=20_300) -> p
             .then(pl.lit(CAP_STRIKE))
             .otherwise(pl.col("rrp"))
             .alias("rrp"),
-            pl.when(pl.col("additional_cap_required") < pl.lit(0) )
+            pl.when(pl.col("additional_cap_required") < pl.lit(0))
             .then(pl.col("futures_cap"))
             .otherwise(pl.col("additional_cap_required"))
             .alias("additional_cap_required")

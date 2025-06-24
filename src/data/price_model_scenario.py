@@ -7,7 +7,7 @@ from src import spark, data
 
 
 
-def price_simulations(model_name: str) -> DataFrame:
+def price_simulations(model_id: Union[str, int]) -> DataFrame:
     """
     Retrieve price simulation data for a specific price model..
     
@@ -25,11 +25,18 @@ def price_simulations(model_name: str) -> DataFrame:
     
 
     """
-    price_models = spark.table("exploration.scenario_modelling.price_models").filter(F.col("model_name") == model_name)
+    price_models = spark.table("exploration.scenario_modelling.price_models")
     price_simulations = spark.table("exploration.scenario_modelling.price_model_simulations")
 
+    if type(model_id) == int:
+        price_models = price_models.filter(F.col("model_id") == F.lit(model_id))
+    elif type(model_id) == str:
+        price_models = price_models.filter(F.col("model_name") == F.lit(model_id))
+    else:
+        raise Exception(f"Invalid model_id: {model_id}. Must be an integer or string.")
+
     if price_models.count() == 0:
-        raise Exception(f"{model_name} is not the name of a trained price model.") 
+        raise Exception(f"{model_id} is not the name of a trained price model.") 
 
     output = (
         price_simulations
@@ -49,7 +56,7 @@ def price_simulations(model_name: str) -> DataFrame:
     )
 
     if output.count() == 0:
-        raise Exception(f"Missing price simulations or model: {model_name}.")
+        raise Exception(f"Missing price simulations or model: {model_id}.")
 
     return output
 

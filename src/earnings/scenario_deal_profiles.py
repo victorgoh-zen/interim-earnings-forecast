@@ -15,8 +15,22 @@ def update_price_model_deal_profiles(model_id: Union[int, str]) -> None:
     )
 
     (
+        # Calculae storage profiles and append to generation profiles
+    )
+
+
+    (
         data.price_model_scenario.load_profiles(model_id)
         .write.mode("overwrite")
         .saveAsTable("exploration.earnings_forecast.scenario_load_profiles")
     )
+
+    return
+
+def generate_storage_profiles(model_id: Union[int, str]):
+    spot_prices = (
+        data.price_model_scenario.price_simulations(model_id)
+    )
+
+
     return

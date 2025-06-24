@@ -267,7 +267,6 @@ def calculate_earnings_forecast() -> None:
         .saveAsTable(MTM_EARNINGS_TABLE)
     )
 
-
     return
 
 def apply_generation_turndown(
