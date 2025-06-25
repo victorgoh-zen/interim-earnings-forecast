@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import polars as pl
 import pyomo.environ as pyo
 from math import ceil
 from functools import reduce
@@ -24,16 +25,18 @@ class StorageModel():
 
     def solve(
         self,
-        spot_price_trace: pd.DataFrame,
+        spot_price_trace: pl.DataFrame,
         interval_length_hours: float=1/12
     ):
         """
         Args:
-            spot_price_trace: pd.DataFrame
-                interval_date_time: datetime
+            spot_price_trace: pl.DataFrame
+                interval_date: date
+                period_id: short
                 rrp: float
-        Returns: pd.DataFrame
-            interval_date_time: datetime
+        Returns: pl.DataFrame
+            interavl_date: date
+            period_id: short
             rrp: float
             discharge_mw: float
             charge_mw: float
@@ -53,8 +56,10 @@ class StorageModel():
 
         spot_price_trace = (
             spot_price_trace
-            .sort_values("interval_date_time")
-            .reset_index(drop=True)
+            .with_columns(
+                index=pl.struct("interval_date", "period_id").rank(method="ordinal")
+            )
+            .sort(["interval_date", "period_id"])
         )
 
         model = pyo.ConcreteModel()
@@ -72,7 +77,7 @@ class StorageModel():
         model.cycles_per_day_target = pyo.Param(initialize=self.cycles_per_day_target)
 
         model.interval_length_hours = pyo.Param(initialize=interval_length_hours)
-        model.spot_price = pyo.Param(model.intervals, initialize=spot_price_trace["rrp"].to_dict())
+        model.spot_price = pyo.Param(model.intervals, initialize=spot_price_trace["rrp"].to_pandas().to_dict())
     
         # Variables
         model.discharge_mw = pyo.Var(
@@ -86,6 +91,12 @@ class StorageModel():
             domain=pyo.NonNegativeReals,
             bounds=(0, self.capacity_mw)
         )
+
+        # model.interval_energy_mwh = pyo.Var(
+        #     model.intervals,
+        #     domain=pyo.Reals,
+        #     bounds=(-self.capacity_mw * self.duration_hours, self.capacity_mw * self.duration_hours)
+        # )
 
         # This represents the storage level at the END of the interval
         model.effective_storage_level_mwh = pyo.Var(
@@ -106,17 +117,31 @@ class StorageModel():
         solver = pyo.SolverFactory("cbc")
         solution = solver.solve(model)
 
-        variables_result = [
-            pd.DataFrame.from_dict(
-                var.extract_values(),
-                orient='index',
-                columns=[str(var)]
+        result = (
+            pl.concat(
+                [
+                    pl.DataFrame({
+                        "index": var.extract_values().keys(),
+                        str(var): var.extract_values().values()
+                    }, schema={"index": pl.Int32(), str(var): pl.Float32()})
+                    for var in model.component_objects(pyo.Var, active=True)
+                ],
+                how="align"
             )
-            for var in model.component_objects(pyo.Var, active=True)
-        ]
-        variables_result.append(spot_price_trace)
-        result = reduce(lambda x, y: pd.merge(x, y, left_index=True,right_index=True), variables_result)
-        
+            .join(
+                spot_price_trace,
+                "index"
+            )
+            .select(
+                "interval_date",
+                "period_id",
+                "rrp",
+                "charge_mw",
+                "discharge_mw",
+                "effective_storage_level_mwh"
+            )
+        )
+
         return result
 
 def arbitrage_profit(model):

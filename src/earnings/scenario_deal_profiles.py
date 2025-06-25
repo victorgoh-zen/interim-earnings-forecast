@@ -27,10 +27,12 @@ def update_price_model_deal_profiles(model_id: Union[int, str]) -> None:
 
     return
 
-def generate_storage_profiles(model_id: Union[int, str]):
-    spot_prices = (
-        data.price_model_scenario.price_simulations(model_id)
-    )
+# def generate_storage_profiles(model_id: Union[int, str]):
+#     spot_prices = (
+#         data.price_model_scenario.price_simulations(model_id)
+#     )
+
+#     storage_details = 
 
 
-    return
+#     return

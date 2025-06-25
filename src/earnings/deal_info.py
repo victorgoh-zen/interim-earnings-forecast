@@ -389,7 +389,7 @@ def deal_settlement_details() -> DataFrame:
             "buy_sell",
             "region_number",
             "start_date",
-            "date",
+            "end_date",
             F.lit(1).cast("double").alias("quantity"),
             F.lit(None).cast("double").alias("price"),
             F.lit(None).cast("double").alias("strike"),
