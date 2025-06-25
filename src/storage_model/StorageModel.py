@@ -42,9 +42,6 @@ class StorageModel():
             charge_mw: float
             effective_storage_level_mwh: float
         Note:
-            Should add linear ramp constraint? Would also reduce erratic cycling?
-            energy_change_mwh = interval_length_hours * (charge_mw[i] + charge_mw[i-1]) / 2
-
             Need to add degradation rate and would need ramp constraints for storage other than BESS.
         """
 
@@ -92,11 +89,12 @@ class StorageModel():
             bounds=(0, self.capacity_mw)
         )
 
-        # model.interval_energy_mwh = pyo.Var(
-        #     model.intervals,
-        #     domain=pyo.Reals,
-        #     bounds=(-self.capacity_mw * self.duration_hours, self.capacity_mw * self.duration_hours)
-        # )
+        # Positive is for discharged energy
+        model.metered_energy_mwh = pyo.Var(
+            model.intervals,
+            domain=pyo.Reals,
+            bounds=(-self.capacity_mw * interval_length_hours, self.capacity_mw * interval_length_hours)
+        )
 
         # This represents the storage level at the END of the interval
         model.effective_storage_level_mwh = pyo.Var(
@@ -107,6 +105,7 @@ class StorageModel():
 
         # Constraints
         model.storage_tracking_constraint = pyo.Constraint(model.intervals, rule=storage_tracking_constraint)
+        model.linear_ramp_constraint = pyo.Constraint(model.intervals, rule=linear_ramp_constraint)
         model.final_storage_level_constraint = pyo.Constraint(model.intervals, rule=final_storage_level_constraint)
         model.cycles_per_day_constraint = pyo.Constraint(rule=cycles_per_day_constraint)
         model.reduce_double_booking_constraint = pyo.Constraint(model.intervals, rule=reduce_double_booking_constraint)
@@ -138,6 +137,7 @@ class StorageModel():
                 "rrp",
                 "charge_mw",
                 "discharge_mw",
+                "metered_energy_mwh",
                 "effective_storage_level_mwh"
             )
         )
@@ -146,22 +146,37 @@ class StorageModel():
 
 def arbitrage_profit(model):
     profit = (
-        pyo.summation(model.spot_price, model.discharge_mw) 
-        - pyo.summation(model.spot_price, model.charge_mw)
+        pyo.summation(model.spot_price, model.metered_energy_mwh) 
     ) * model.interval_length_hours
     return profit
 
 def storage_tracking_constraint(model, interval):
-    energy_change_mwh = (
-        model.interval_length_hours * model.round_trip_efficiency * model.charge_mw[interval] - 
-        model.interval_length_hours * model.discharge_mw[interval]
-    )
     
     if interval == 0:
-        # Enforces starting initial level constraint
-        return model.effective_storage_level_mwh[interval] == model.initial_storage_mwh + energy_change_mwh
+        # Enforces initial storage level constraint
+
+        stored_energy_change_mwh = (
+            model.charge_mw[interval] * model.round_trip_efficiency - 
+            model.discharge_mw[interval]
+        ) * model.interval_length_hours / 2
+
+        return model.effective_storage_level_mwh[interval] == model.initial_storage_mwh + stored_energy_change_mwh
     else:
-        return model.effective_storage_level_mwh[interval] == model.effective_storage_level_mwh[interval-1] + energy_change_mwh
+        stored_energy_change_mwh = (
+            (model.charge_mw[interval] + model.charge_mw[interval-1]) * model.round_trip_efficiency - 
+            (model.discharge_mw[interval] + model.discharge_mw[interval-1])
+        ) * model.interval_length_hours / 2
+
+        return model.effective_storage_level_mwh[interval] == model.effective_storage_level_mwh[interval-1] + stored_energy_change_mwh
+
+def linear_ramp_constraint(model, interval):
+    if interval == 0:
+        # Assumes at rest at interval -1
+        return model.metered_energy_mwh[interval] == (model.discharge_mw[interval] - model.charge_mw[interval]) * model.interval_length_hours / 2
+    else:
+        return model.metered_energy_mwh[interval] == (
+            model.discharge_mw[interval] + model.discharge_mw[interval-1] - model.charge_mw[interval] - model.charge_mw[interval-1]
+        ) * model.interval_length_hours / 2
 
 def final_storage_level_constraint(model, interval):
     if interval == model.intervals.at(-1):
