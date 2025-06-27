@@ -22,6 +22,9 @@ def retail_rate_calendar() -> DataFrame:
 def scenario_generation_profiles() -> DataFrame:
     return spark.table("scenario_generation_profiles")
 
+def scenario_storage_profiles() -> DataFrame:
+    return spark.table("scenario_storage_profiles")
+
 def scenario_load_profiles() -> DataFrame:
     return spark.table("scenario_load_profiles")
 
@@ -68,7 +71,7 @@ def daily_mtm_scenario_generation_profiles() -> DataFrame:
 
 
 
-    output = (
+    gen_output = (
         scenario_generation_profiles()
         .withColumnRenamed("year", "gen_reference_year")
         .join(
@@ -83,10 +86,27 @@ def daily_mtm_scenario_generation_profiles() -> DataFrame:
         )
     )
 
-    if output.count() == 0:
+    if gen_output.count() == 0:
         raise Exception("Could not create scenario generation profiles. Earnings forecast scenario tables likely out of sync.")
 
-    return output
+    storage_output = (
+        scenario_storage_profiles()
+        .join(
+            sample_index,
+            ["model_id", "sample_id", "interval_date", "period_id"]
+        )
+        .select(
+            "product_id",
+            "interval_date",
+            "period_id",
+            "generation_mwh"
+        )
+    )
+
+    if gen_output.count() == 0:
+        raise Exception("Could not find scenario storage profiles. Earnings forecast scenario tables likely out of sync.")
+
+    return gen_output.unionByName(storage_output)
 
 def daily_mtm_scenario_load_profiles() -> DataFrame:
     """

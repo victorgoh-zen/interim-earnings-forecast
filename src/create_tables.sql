@@ -42,6 +42,17 @@ CREATE OR REPLACE TABLE scenario_generation_profiles (
   CONSTRAINT fk_generation_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id)
 );
 
+CREATE OR REPLACE TABLE scenario_storage_profiles (
+  model_id SMALLINT NOT NULL,
+  product_id INTEGER NOT NULL,
+  sample_id SMALLINT NOT NULL,
+  interval_date DATE NOT NULL,
+  period_id SMALLINT NOT NULL,
+  generation_mwh FLOAT NOT NULL,
+  CONSTRAINT pk_storage_profile PRIMARY KEY (model_id, product_id, sample_id, interval_date, period_id),
+  CONSTRAINT fk_storage_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id)
+);
+
 CREATE OR REPLACE TABLE scenario_load_profiles (
   model_id SMALLINT NOT NULL,
   product_id INTEGER NOT NULL,

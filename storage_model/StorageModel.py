@@ -15,6 +15,12 @@ class StorageModel():
         initial_storage_fraction: float=0.0,
         final_storage_fraction: float=0.0
     ):
+        if os.system("which cbc > /dev/null") != 0:
+            cbc_bin_location = "/Volumes/exploration/earnings_forecast/bin/cbc"
+            exit_code = os.system(f"cp {cbc_bin_location} /usr/bin/cbc")
+            if exit_code != 0:
+                raise Exception("Could not find 'cbc' binary and failed to copy binary from {cbc_bin_location}")
+
         self.capacity_mw = capacity_mw
         self.duration_hours = duration_hours
         self.round_trip_efficiency = round_trip_efficiency
@@ -26,31 +32,32 @@ class StorageModel():
     def solve(
         self,
         spot_price_trace: pl.DataFrame,
-        interval_length_hours: float=1/12
+        interval_length_hours: float=1/12,
+        # rollup_factor: int=1
     ):
         """
         Args:
             spot_price_trace: pl.DataFrame
+                *,
                 interval_date: date
                 period_id: short
                 rrp: float
         Returns: pl.DataFrame
-            interavl_date: date
+            *,
+            intervall_date: date
             period_id: short
             rrp: float
             discharge_mw: float
             charge_mw: float
+            metered_energy_mwh: float
             effective_storage_level_mwh: float
         Note:
             Need to add degradation rate and would need ramp constraints for storage other than BESS.
+
+            Should add option to solve at a higher granularity i.e. 30-minutely to reduce computational cost.
+            This may not be the correct level of abstraction at which to do this. This wouldn't play nice with
+            the linear ramp constraint. 
         """
-
-        if os.system("which cbc > /dev/null") != 0:
-            cbc_bin_location = "/Volumes/exploration/earnings_forecast/bin/cbc"
-            exit_code = os.system(f"cp {cbc_bin_location} /usr/bin/cbc")
-            if exit_code != 0:
-                raise Exception("Could not find 'cbc' binary and failed to copy binary from {cbc_bin_location}")
-
         spot_price_trace = (
             spot_price_trace
             .with_columns(
@@ -77,6 +84,7 @@ class StorageModel():
         model.spot_price = pyo.Param(model.intervals, initialize=spot_price_trace["rrp"].to_pandas().to_dict())
     
         # Variables
+        # charge and discharge represent MW outpt at end of interval
         model.discharge_mw = pyo.Var(
             model.intervals,
             domain=pyo.NonNegativeReals,
@@ -117,29 +125,21 @@ class StorageModel():
         solution = solver.solve(model)
 
         result = (
-            pl.concat(
-                [
-                    pl.DataFrame({
-                        "index": var.extract_values().keys(),
-                        str(var): var.extract_values().values()
-                    }, schema={"index": pl.Int32(), str(var): pl.Float32()})
-                    for var in model.component_objects(pyo.Var, active=True)
-                ],
-                how="align"
-            )
+            spot_price_trace
             .join(
-                spot_price_trace,
+                pl.concat(
+                    [
+                        pl.DataFrame({
+                            "index": var.extract_values().keys(),
+                            str(var): var.extract_values().values()
+                        }, schema={"index": pl.Int32(), str(var): pl.Float32()})
+                        for var in model.component_objects(pyo.Var, active=True)
+                    ],
+                    how="align"
+                ),
                 "index"
             )
-            .select(
-                "interval_date",
-                "period_id",
-                "rrp",
-                "charge_mw",
-                "discharge_mw",
-                "metered_energy_mwh",
-                "effective_storage_level_mwh"
-            )
+            .drop("index")
         )
 
         return result

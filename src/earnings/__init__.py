@@ -1,5 +1,5 @@
 from src.earnings import settlement_calculations
-from src.earnings.scenario_deal_profiles import update_price_model_deal_profiles
+from src.earnings.scenario_deal_profiles import update_price_model_deal_profiles, generate_storage_profiles
 from src.earnings.deal_info import (
     update_deal_settlement_details_table,
     update_retail_rate_calendar_table

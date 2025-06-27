@@ -47,6 +47,7 @@ def calculate_earnings_forecast() -> None:
         spot_prices=spot_prices
     )
 
+
     # Retail data
     load_profiles = pl.from_arrow(data.earnings.daily_mtm_scenario_load_profiles().toArrow())
     rate_calendar = pl.from_arrow(data.earnings.retail_rate_calendar().toArrow())

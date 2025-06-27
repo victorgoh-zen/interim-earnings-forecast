@@ -60,6 +60,18 @@ def price_simulations(model_id: Union[str, int]) -> DataFrame:
 
     return output
 
+def model_id(model_id: Union[str, int]):
+    if type(model_id) == int:
+        return model_id
+    elif type(model_id) == str:
+        return int(
+            spark.table("exploration.scenario_modelling.price_models")
+            .filter(F.col("model_name") == model_id)
+            .select("model_id")
+            .toPandas()
+            .squeeze()
+        )
+
 def region_numbers() -> DataFrame:
     """
     Retrieve region number lookup data as a broadcast variable.
@@ -143,19 +155,13 @@ def intermittent_generation_profiles(model_id: Union[int, str]) -> DataFrame:
     """
     calendar = spark.table("prod.silver.calendar_datetime")
 
-    file_dir = os.path.dirname(os.path.abspath(__file__))
-    ppa_details_file_path = os.path.join(file_dir, "..", "..", "utils", "ppa_details.csv")
-    if not os.path.isfile(ppa_details_file_path):
-        raise Exception(f"Missing ppa_details.csv file at {ppa_details_file_path}")
+    # file_dir = os.path.dirname(os.path.abspath(__file__))
+    # ppa_details_file_path = os.path.join(file_dir, "..", "..", "utils", "ppa_details.csv")
+    # if not os.path.isfile(ppa_details_file_path):
+    #     raise Exception(f"Missing ppa_details.csv file at {ppa_details_file_path}")
 
     ppa_details = F.broadcast(
-        spark.createDataFrame(
-            pd.read_csv(ppa_details_file_path)
-        )
-        .join(
-            region_numbers(),
-            "regionid"
-        )
+        data.sim.ppa_details()
         .select(
             "product_id",
             "duid",
@@ -337,7 +343,7 @@ def intermittent_generation_profiles(model_id: Union[int, str]) -> DataFrame:
                     F.col("availability"),
                     F.col("scadavalue"),
                     F.col("regional_capacity_factor") * F.col("size_mw")
-                ) * F.col("transmissionlossfactor") * F.col("distributionlossfactor")
+                ) / F.lit(12) * F.col("transmissionlossfactor") * F.col("distributionlossfactor")
             ).cast("float")
         )
         .dropna(subset=["generation_mwh"])
@@ -460,18 +466,6 @@ def load_profiles(model_id: Union[int, str]) -> DataFrame:
         )
     )
     return load_profiles
-
-def storage_dispatch_profiles(model_id: Union[int, str]) -> DataFrame:
-    """
-    Returns: pyspark.sql.DataFrame
-        - product_id: intege
-        - sample_id: short
-        - interval_date: date
-        - period_id: short
-        - quantity_mw: float
-    """
-    ...
-    return
 
 
 
