@@ -10,18 +10,18 @@ from pyspark.sql import functions as F, Window as W, types as T, DataFrame
 from src import data, spark
 from storage_model import StorageModel
 
-def update_price_model_deal_profiles(model_id: Union[int, str]) -> None:
+def update_deal_profiles(model_id: Union[int, str]) -> None:
     
     (
-        data.price_model_scenario.intermittent_generation_profiles(model_id)
+        data.zen_scenario.intermittent_generation_profiles(model_id)
         .write.mode("overwrite")
-        .saveAsTable("exploration.earnings_forecast.scenario_generation_profiles")
+        .saveAsTable("exploration.earnings_forecast.zen_scenario_generation_profiles")
     )
 
     (
-        data.price_model_scenario.load_profiles(model_id)
+        data.zen_scenario.load_profiles(model_id)
         .write.mode("overwrite")
-        .saveAsTable("exploration.earnings_forecast.scenario_load_profiles")
+        .saveAsTable("exploration.earnings_forecast.zen_scenario_load_profiles")
     )
 
     return
@@ -31,7 +31,7 @@ def generate_storage_profiles(model_id: Union[int, str]):
     lgc_prices = data.market_price.lgc_prices()    
     num_cores = multiprocessing.cpu_count()
 
-    model_id = data.price_model_scenario.model_id(model_id)
+    model_id = data.zen_scenario.model_id(model_id)
     
     for _, row in storage_details.iterrows():
         product_id = row["product_id"]
@@ -45,7 +45,7 @@ def generate_storage_profiles(model_id: Union[int, str]):
         model = StorageModel(capacity_mw, duration_hours, round_trip_efficiency)
 
         spot_prices = pl.from_arrow(
-            data.price_model_scenario.price_simulations(model_id)
+            data.zen_scenario.price_simulations(model_id)
             .join(
                 lgc_prices
                 .withColumnRenamed("price", "lgc_price"),
@@ -82,7 +82,7 @@ def generate_storage_profiles(model_id: Union[int, str]):
 
         results = pl.concat(results)
         
-        spark.sql(f"DELETE FROM exploration.earnings_forecast.scenario_storage_profiles WHERE product_id = {product_id};")
+        spark.sql(f"DELETE FROM exploration.earnings_forecast.zen_scenario_storage_profiles WHERE product_id = {product_id};")
         
         (
             spark.createDataFrame(results.to_arrow())
@@ -117,7 +117,7 @@ def generate_storage_profiles(model_id: Union[int, str]):
             )
             .orderBy("sample_id", "product_id", "interval_date", "period_id")
             .write.mode("append")
-            .saveAsTable("exploration.earnings_forecast.scenario_storage_profiles")
+            .saveAsTable("exploration.earnings_forecast.zen_scenario_storage_profiles")
         )
 
     return

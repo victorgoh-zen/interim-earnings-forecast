@@ -30,7 +30,7 @@ CREATE OR REPLACE TABLE daily_mtm_scenario_earnings (
   CONSTRAINT fk_mtm_earnings_instrument FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id)
 );
 
-CREATE OR REPLACE TABLE scenario_generation_profiles (
+CREATE OR REPLACE TABLE zen_scenario_generation_profiles (
   model_id SMALLINT NOT NULL,
   product_id INTEGER NOT NULL,
   year SMALLINT NOT NULL,
@@ -38,22 +38,22 @@ CREATE OR REPLACE TABLE scenario_generation_profiles (
   day_id SMALLINT NOT NULL,
   period_id SMALLINT NOT NULL,
   generation_mwh FLOAT NOT NULL,
-  CONSTRAINT pk_generation_profile PRIMARY KEY (product_id, year, month_id, day_id, period_id),
-  CONSTRAINT fk_generation_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id)
+  CONSTRAINT pk_zs_generation_profile PRIMARY KEY (product_id, year, month_id, day_id, period_id),
+  CONSTRAINT fk_zs_generation_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id)
 );
 
-CREATE OR REPLACE TABLE scenario_storage_profiles (
+CREATE OR REPLACE TABLE zen_scenario_storage_profiles (
   model_id SMALLINT NOT NULL,
   product_id INTEGER NOT NULL,
   sample_id SMALLINT NOT NULL,
   interval_date DATE NOT NULL,
   period_id SMALLINT NOT NULL,
   generation_mwh FLOAT NOT NULL,
-  CONSTRAINT pk_storage_profile PRIMARY KEY (model_id, product_id, sample_id, interval_date, period_id),
-  CONSTRAINT fk_storage_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id)
+  CONSTRAINT pk_zs_storage_profile PRIMARY KEY (model_id, product_id, sample_id, interval_date, period_id),
+  CONSTRAINT fk_zs_storage_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id)
 );
 
-CREATE OR REPLACE TABLE scenario_load_profiles (
+CREATE OR REPLACE TABLE zen_scenario_load_profiles (
   model_id SMALLINT NOT NULL,
   product_id INTEGER NOT NULL,
   jurisdiction_id TINYINT NOT NULL,
@@ -62,9 +62,26 @@ CREATE OR REPLACE TABLE scenario_load_profiles (
   day_id SMALLINT NOT NULL,
   period_id SMALLINT NOT NULL,
   load_mwh FLOAT NOT NULL,
-  CONSTRAINT pk_load_profile PRIMARY KEY (product_id, jurisdiction_id, year, month_id, day_id, period_id),
-  CONSTRAINT fk_load_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id),
-  CONSTRAINT fk_load_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES scenario_modelling.jurisdictions(jurisdiction_id)
+  CONSTRAINT pk_zs_load_profile PRIMARY KEY (product_id, jurisdiction_id, year, month_id, day_id, period_id),
+  CONSTRAINT fk_zs_load_model FOREIGN KEY (model_id) REFERENCES scenario_modelling.price_models(model_id),
+  CONSTRAINT fk_zs_load_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES scenario_modelling.jurisdictions(jurisdiction_id)
+);
+
+CREATE OR REPLACE TABLE zen_scenario_earnings (
+  sample_id SMALLINT NOT NULL,
+  product_id SMALLINT NOT NULL,
+  deal_id SMALLINT NOT NULL,
+  instrument_id SMALLINT NOT NULL,
+  region_number TINYINT NOT NULL,
+  buy BOOLEAN NOT NULL,
+  interval_date DATE NOT NULL,
+  period_id SMALLINT NOT NULL,
+  volume_mwh FLOAT NOT NULL,
+  income FLOAT NOT NULL,
+  cost FLOAT NOT NULL,
+  CONSTRAINT pk_zs_mtm_earnings  PRIMARY KEY (product_id, deal_id, instrument_id, region_number, interval_date, period_id),
+  CONSTRAINT fk_zs_mtm_earnings_region FOREIGN KEY (region_number) REFERENCES scenario_modelling.region_numbers(region_number),
+  CONSTRAINT fk_zs_mtm_earnings_instrument FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id)
 );
 
 CREATE OR REPLACE TABLE deal_settlement_details (
