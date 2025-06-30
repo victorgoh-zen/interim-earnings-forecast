@@ -30,6 +30,25 @@ CREATE OR REPLACE TABLE daily_mtm_scenario_earnings (
   CONSTRAINT fk_mtm_earnings_instrument FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id)
 );
 
+CREATE OR REPLACE TABLE mtm_scenario_quarterly_aggregate_earnings (
+  run_date DATE NOT NULL,
+  product_id SMALLINT NOT NULL,
+  deal_id SMALLINT NOT NULL,
+  instrument_id SMALLINT NOT NULL,
+  region_number TINYINT NOT NULL,
+  buy BOOLEAN NOT NULL,
+  calendar_year SMALLINT NOT NULL,
+  calendar_quarter SMALLINT NOT NULL,
+  volume_mwh FLOAT NOT NULL,
+  income FLOAT NOT NULL,
+  cost FLOAT NOT NULL,
+  CONSTRAINT pk_quarterly_aggregate PRIMARY KEY (
+    run_date, product_id, deal_id, instrument_id, region_number, calendar_year, calendar_quarter
+  ),
+  CONSTRAINT fk_quarterly_aggregate_region FOREIGN KEY (region_number) REFERENCES scenario_modelling.region_numbers(region_number),
+  CONSTRAINT fk_quarterly_aggregate_instrument FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id)
+);
+
 CREATE OR REPLACE TABLE scenario_generation_profiles (
   model_id SMALLINT NOT NULL,
   product_id INTEGER NOT NULL,
