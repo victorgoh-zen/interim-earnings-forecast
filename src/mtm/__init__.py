@@ -1,2 +1,3 @@
 from src.mtm.earnings_forecast import calculate_earnings_forecast
 from src.mtm.scenario_price import generate_scenario_prices
+from src.mtm.quarterly_aggregate import update_quarterly_aggregate

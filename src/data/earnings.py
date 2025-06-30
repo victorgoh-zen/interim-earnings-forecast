@@ -198,5 +198,8 @@ def daily_mtm_scenario_product_profiles() -> DataFrame:
 
     return output
 
+def daily_mtm_scenario_earnings() -> DataFrame:
+    return spark.table("exploration.earnings_forecast.daily_mtm_scenario_earnings")
+
 
     
